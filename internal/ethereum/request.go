@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"math/big"
+	"math/rand/v2"
 	"net/http"
 )
 
@@ -13,11 +13,12 @@ const (
 	cloudflareEthApiEndpoint = "https://cloudflare-eth.com"
 	defaultJSONRpc           = "2.0"
 
-	methodGetCurrentBlock = "eth_subscribe"
+	methodGetCurrentBlock     = "eth_blockNumber"
+	methodGetTransactionCount = "eth_getTransactionCount"
 )
 
 type ethRequest struct {
-	ID      int      `json:"id"`
+	ID      int64    `json:"id"`
 	JSONRpc string   `json:"jsonrpc"`
 	Method  string   `json:"method"`
 	Params  []string `json:"params"`
@@ -30,8 +31,9 @@ type ethBaseResponse struct {
 
 // getCurrentBlock returns current block number based on the http call
 // to the api.
-func getCurrentBlock(httpClient *http.Client) (int64, error) {
+func getCurrentBlock(httpClient *http.Client) (string, error) {
 	ethReq := ethRequest{
+		ID:      generateRandomID(),
 		JSONRpc: defaultJSONRpc,
 		Method:  methodGetCurrentBlock,
 		Params:  []string{},
@@ -39,36 +41,78 @@ func getCurrentBlock(httpClient *http.Client) (int64, error) {
 
 	body, err := json.Marshal(ethReq)
 	if err != nil {
-		return 0, fmt.Errorf("json marshal request: %w", err)
+		return "", fmt.Errorf("json marshal request: %w", err)
 	}
 
 	req, err := http.NewRequest(http.MethodPost, cloudflareEthApiEndpoint, bytes.NewBuffer(body))
 	if err != nil {
-		return 0, fmt.Errorf("new http request: %w", err)
+		return "", fmt.Errorf("new http request: %w", err)
 	}
 
 	res, err := httpClient.Do(req)
 	if err != nil {
-		return 0, fmt.Errorf("http client do request: %w", err)
+		return "", fmt.Errorf("http client do request: %w", err)
 	}
 
 	if res.StatusCode < 200 && res.StatusCode > 299 {
-		return 0, fmt.Errorf("invalid response status code from api")
+		return "", fmt.Errorf("invalid response status code from api")
 	}
 
 	readBytes, err := io.ReadAll(res.Body)
 	if err != nil {
-		return 0, fmt.Errorf("read all bytes from response: %w", err)
+		return "", fmt.Errorf("read all bytes from response: %w", err)
 	}
 
 	var ethRes ethBaseResponse
 	if err := json.Unmarshal(readBytes, &ethRes); err != nil {
-		return 0, fmt.Errorf("json unmarshal bytes from response: %w", err)
+		return "", fmt.Errorf("json unmarshal bytes from response: %w", err)
 	}
 
-	n := new(big.Int)
-	// passing 0, it will pick base based on the string
-	n.SetString(ethRes.Result, 0)
+	return ethRes.Result, nil
+}
+
+func getTransactionsForBlock(httpClient *http.Client, blockNum string) ([]Transaction, error) {
+	ethReq := ethRequest{
+		ID:      generateRandomID(),
+		JSONRpc: defaultJSONRpc,
+		Method:  methodGetCurrentBlock,
+		Params: []string{
+			blockNum,
+		},
+	}
+
+	body, err := json.Marshal(ethReq)
+	if err != nil {
+		return nil, fmt.Errorf("json marshal request: %w", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, cloudflareEthApiEndpoint, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, fmt.Errorf("new http request: %w", err)
+	}
+
+	res, err := httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("http client do request: %w", err)
+	}
+
+	if res.StatusCode < 200 && res.StatusCode > 299 {
+		return nil, fmt.Errorf("invalid response status code from api")
+	}
+
+	readBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read all bytes from response: %w", err)
+	}
+
+	var ethRes ethBaseResponse
+	if err := json.Unmarshal(readBytes, &ethRes); err != nil {
+		return nil, fmt.Errorf("json unmarshal bytes from response: %w", err)
+	}
 
 	return n.Int64(), nil
+}
+
+func generateRandomID() int64 {
+	return rand.Int64()
 }

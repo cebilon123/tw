@@ -6,27 +6,48 @@ import (
 	"tw/internal/ethereum"
 )
 
-// TransactionSerializer is simple in memory serializer
+// TransactionMemoryStorage is simple in memory serializer
 // for the transactions.
-type TransactionSerializer struct {
-	transactions []ethereum.SerializableTransaction
+type TransactionMemoryStorage struct {
+	transactionsMap map[string][]ethereum.Transaction
 
 	mu sync.Mutex
 }
 
-var _ ethereum.TransactionSerializer = (*TransactionSerializer)(nil)
+var _ ethereum.TransactionsStorage = (*TransactionMemoryStorage)(nil)
 
-func NewMemoryTransactionSerializer() *TransactionSerializer {
-	return &TransactionSerializer{}
+func NewMemoryTransactionStorage() *TransactionMemoryStorage {
+	return &TransactionMemoryStorage{
+		transactionsMap: make(map[string][]ethereum.Transaction),
+	}
 }
 
 // SerializeTransaction serializes transactions to the memory.
-func (ts *TransactionSerializer) SerializeTransaction(transaction ethereum.SerializableTransaction) error {
+func (ts *TransactionMemoryStorage) SerializeTransaction(serializableTransaction ethereum.SerializableTransaction) error {
 	// it could be used by multiple clients simultaneously
 	ts.mu.Lock()
 	defer ts.mu.Unlock()
 
-	ts.transactions = append(ts.transactions, transaction)
+	_, ok := ts.transactionsMap[serializableTransaction.Address]
+	if !ok {
+		ts.transactionsMap[serializableTransaction.Address] = []ethereum.Transaction{serializableTransaction.Transaction}
+
+		return nil
+	}
+
+	ts.transactionsMap[serializableTransaction.Address] = append(ts.transactionsMap[serializableTransaction.Address], serializableTransaction.Transaction)
 
 	return nil
+}
+
+func (ts *TransactionMemoryStorage) GetTransactionsForAddress(address string) []ethereum.Transaction {
+	ts.mu.Lock()
+	defer ts.mu.Unlock()
+
+	v, ok := ts.transactionsMap[address]
+	if !ok {
+		return nil
+	}
+
+	return v
 }

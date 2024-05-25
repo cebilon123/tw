@@ -12,9 +12,9 @@ import (
 type Parser = ethereum.Parser
 
 func NewDefaultParser() Parser {
-	observer := ethereum.NewJSONRpcBasedObserver(http.DefaultClient)
-	serializer := memory.NewMemoryTransactionSerializer()
 	cmdLogger := log.New(os.Stdout, "PARSER: ", log.Ldate|log.Ltime|log.Lshortfile)
+	observer := ethereum.NewJSONRpcBasedObserver(http.DefaultClient, cmdLogger)
+	storage := memory.NewMemoryTransactionStorage()
 
-	return ethereum.NewJSONRPCParser(observer, serializer, http.DefaultClient, cmdLogger)
+	return ethereum.NewJSONRPCParser(observer, storage, http.DefaultClient, cmdLogger)
 }

@@ -3,9 +3,14 @@ package ethereum
 import (
 	"io"
 	"log"
+	"math/big"
 	"net/http"
 	"sync"
 )
+
+// maxBlockDepth describes how many blocks from the current one
+// we are going to look for the transactions.
+const maxBlockDepth = 20
 
 // Parser must be implemented by any struct
 // that can communicate with the ethereum
@@ -27,19 +32,44 @@ type Observer interface {
 	ObserveAddress(address string) (<-chan Transaction, error)
 }
 
-// TransactionSerializer must be implemented by the struct
-// that can be used to serialize transaction information
-type TransactionSerializer interface {
+// TransactionsStorage should be implemented
+// by the struct that can store transactions.
+type TransactionsStorage interface {
 	// SerializeTransaction serializes given transaction. It should be multiple goroutines safe.
 	SerializeTransaction(transaction SerializableTransaction) error
+	// GetTransactionsForAddress returns transactions for a given
+	// address. It should be multiple goroutines safe.
+	GetTransactionsForAddress(address string) []Transaction
 }
 
 // Transaction represents transaction from
 // Ethereum.
 type Transaction struct {
-	ID      int64
-	JsonRPC string
-	Result  string
+	Jsonrpc string `json:"jsonrpc"`
+	Result  struct {
+		Type                 string `json:"type"`
+		BlockHash            string `json:"blockHash"`
+		BlockNumber          string `json:"blockNumber"`
+		From                 string `json:"from"`
+		Gas                  string `json:"gas"`
+		Hash                 string `json:"hash"`
+		Input                string `json:"input"`
+		Nonce                string `json:"nonce"`
+		To                   string `json:"to"`
+		TransactionIndex     string `json:"transactionIndex"`
+		Value                string `json:"value"`
+		V                    string `json:"v"`
+		R                    string `json:"r"`
+		S                    string `json:"s"`
+		GasPrice             string `json:"gasPrice"`
+		MaxFeePerGas         string `json:"maxFeePerGas"`
+		MaxPriorityFeePerGas string `json:"maxPriorityFeePerGas"`
+		ChainId              string `json:"chainId"`
+		AccessList           []struct {
+			Address     string   `json:"address"`
+			StorageKeys []string `json:"storageKeys"`
+		} `json:"accessList"`
+	} `json:"result"`
 }
 
 // SerializableTransaction represents transaction
@@ -53,10 +83,10 @@ type SerializableTransaction struct {
 // JSONRPCParser used to parse transactions
 // with the help of JSONRPC.
 type JSONRPCParser struct {
-	observer   Observer
-	serializer TransactionSerializer
-	logger     *log.Logger
-	httpClient *http.Client
+	observer            Observer
+	transactionsStorage TransactionsStorage
+	logger              *log.Logger
+	httpClient          *http.Client
 
 	closeChan     chan struct{}
 	subscribersWG sync.WaitGroup
@@ -68,18 +98,18 @@ var _ io.Closer = (*JSONRPCParser)(nil)
 // NewJSONRPCParser creates a new instance of JSONRPCParser.
 func NewJSONRPCParser(
 	observer Observer,
-	serializer TransactionSerializer,
+	transactionsStorage TransactionsStorage,
 	httpClient *http.Client,
 	logger *log.Logger,
 ) *JSONRPCParser {
 	closeChan := make(chan struct{}, 1)
 
 	return &JSONRPCParser{
-		observer:   observer,
-		httpClient: httpClient,
-		logger:     logger,
-		serializer: serializer,
-		closeChan:  closeChan,
+		observer:            observer,
+		httpClient:          httpClient,
+		logger:              logger,
+		transactionsStorage: transactionsStorage,
+		closeChan:           closeChan,
 	}
 }
 
@@ -103,7 +133,11 @@ func (jp *JSONRPCParser) GetCurrentBlock() int {
 		return 0
 	}
 
-	return int(res)
+	n := new(big.Int)
+	// passing 0, it will pick base based on the string
+	n.SetString(res, 0)
+
+	return int(n.Int64())
 }
 
 func (jp *JSONRPCParser) Subscribe(address string) bool {
@@ -121,8 +155,7 @@ func (jp *JSONRPCParser) Subscribe(address string) bool {
 }
 
 func (jp *JSONRPCParser) GetTransactions(address string) []Transaction {
-	//TODO implement me
-	panic("implement me")
+	return jp.transactionsStorage.GetTransactionsForAddress(address)
 }
 
 func (jp *JSONRPCParser) onTransactionsSubscribe(address string, transactionsChan <-chan Transaction) {
@@ -142,7 +175,7 @@ func (jp *JSONRPCParser) onTransactionsSubscribe(address string, transactionsCha
 				return
 			}
 
-			if err := jp.serializer.SerializeTransaction(SerializableTransaction{
+			if err := jp.transactionsStorage.SerializeTransaction(SerializableTransaction{
 				Address:     address,
 				Transaction: transaction,
 			}); err != nil {
