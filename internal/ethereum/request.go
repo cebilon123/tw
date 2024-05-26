@@ -13,8 +13,9 @@ const (
 	cloudflareEthApiEndpoint = "https://cloudflare-eth.com"
 	defaultJSONRpc           = "2.0"
 
-	methodGetCurrentBlock     = "eth_blockNumber"
-	methodGetTransactionCount = "eth_getTransactionCount"
+	methodGetCurrentBlock      = "eth_blockNumber"
+	methodGetBlockByNumber     = "eth_getBlockByNumber"
+	methodGetTransactionByHash = "eth_getTransactionByHash"
 )
 
 type ethRequest struct {
@@ -71,13 +72,51 @@ func getCurrentBlock(httpClient *http.Client) (string, error) {
 	return ethRes.Result, nil
 }
 
+type getBlockByNumberResponse struct {
+	Jsonrpc string `json:"jsonrpc"`
+	Result  struct {
+		BaseFeePerGas         string        `json:"baseFeePerGas"`
+		BlobGasUsed           string        `json:"blobGasUsed"`
+		Difficulty            string        `json:"difficulty"`
+		ExcessBlobGas         string        `json:"excessBlobGas"`
+		ExtraData             string        `json:"extraData"`
+		GasLimit              string        `json:"gasLimit"`
+		GasUsed               string        `json:"gasUsed"`
+		Hash                  string        `json:"hash"`
+		LogsBloom             string        `json:"logsBloom"`
+		Miner                 string        `json:"miner"`
+		MixHash               string        `json:"mixHash"`
+		Nonce                 string        `json:"nonce"`
+		Number                string        `json:"number"`
+		ParentBeaconBlockRoot string        `json:"parentBeaconBlockRoot"`
+		ParentHash            string        `json:"parentHash"`
+		ReceiptsRoot          string        `json:"receiptsRoot"`
+		Sha3Uncles            string        `json:"sha3Uncles"`
+		Size                  string        `json:"size"`
+		StateRoot             string        `json:"stateRoot"`
+		Timestamp             string        `json:"timestamp"`
+		TotalDifficulty       string        `json:"totalDifficulty"`
+		Transactions          []string      `json:"transactions"`
+		TransactionsRoot      string        `json:"transactionsRoot"`
+		Uncles                []interface{} `json:"uncles"`
+		Withdrawals           []struct {
+			Index          string `json:"index"`
+			ValidatorIndex string `json:"validatorIndex"`
+			Address        string `json:"address"`
+			Amount         string `json:"amount"`
+		} `json:"withdrawals"`
+		WithdrawalsRoot string `json:"withdrawalsRoot"`
+	} `json:"result"`
+}
+
 func getTransactionsForBlock(httpClient *http.Client, blockNum string) ([]Transaction, error) {
 	ethReq := ethRequest{
 		ID:      generateRandomID(),
 		JSONRpc: defaultJSONRpc,
-		Method:  methodGetCurrentBlock,
+		Method:  methodGetBlockByNumber,
 		Params: []string{
 			blockNum,
+			"false",
 		},
 	}
 
@@ -105,12 +144,70 @@ func getTransactionsForBlock(httpClient *http.Client, blockNum string) ([]Transa
 		return nil, fmt.Errorf("read all bytes from response: %w", err)
 	}
 
-	var ethRes ethBaseResponse
+	var ethRes getBlockByNumberResponse
 	if err := json.Unmarshal(readBytes, &ethRes); err != nil {
 		return nil, fmt.Errorf("json unmarshal bytes from response: %w", err)
 	}
 
-	return n.Int64(), nil
+	var transactions []Transaction
+
+	for _, transactionHash := range ethRes.Result.Transactions {
+		transaction, err := getTransaction(httpClient, transactionHash)
+		if err != nil {
+			return nil, fmt.Errorf("fetching transactions: %w", err)
+		}
+
+		transactions = append(transactions, *transaction)
+	}
+
+	return transactions, nil
+}
+
+type getTransactionByHashResponse struct {
+	Jsonrpc string `json:"jsonrpc"`
+	Result  Transaction
+}
+
+func getTransaction(httpClient *http.Client, transactionHash string) (*Transaction, error) {
+	ethReq := ethRequest{
+		ID:      generateRandomID(),
+		JSONRpc: defaultJSONRpc,
+		Method:  methodGetTransactionByHash,
+		Params: []string{
+			transactionHash,
+		},
+	}
+
+	body, err := json.Marshal(ethReq)
+	if err != nil {
+		return nil, fmt.Errorf("json marshal request: %w", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, cloudflareEthApiEndpoint, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, fmt.Errorf("new http request: %w", err)
+	}
+
+	res, err := httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("http client do request: %w", err)
+	}
+
+	if res.StatusCode < 200 && res.StatusCode > 299 {
+		return nil, fmt.Errorf("invalid response status code from api")
+	}
+
+	readBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read all bytes from response: %w", err)
+	}
+
+	var ethRes getTransactionByHashResponse
+	if err := json.Unmarshal(readBytes, &ethRes); err != nil {
+		return nil, fmt.Errorf("json unmarshal bytes from response: %w", err)
+	}
+
+	return &ethRes.Result, nil
 }
 
 func generateRandomID() int64 {

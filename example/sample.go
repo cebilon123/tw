@@ -1,13 +1,22 @@
 package main
 
-import "tw/pkg"
+import (
+	"log"
+	"time"
+	"tw/pkg"
+)
 
-const testAddress = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
+const testAddress = "0x55a380d134d722006a5ce2d510562e1239d225b1"
 
 func main() {
 	parser := pkg.NewDefaultParser()
 	block := parser.GetCurrentBlock()
 	println(block)
 
-	parser.GetTransactions(testAddress)
+	parser.Subscribe(testAddress)
+
+	for {
+		log.Println(len(parser.GetTransactions(testAddress)))
+		time.Sleep(time.Second * 3)
+	}
 }
