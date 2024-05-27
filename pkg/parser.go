@@ -1,8 +1,9 @@
 package pkg
 
 import (
-	"log"
 	"net/http"
+
+	"tw/internal/clogger"
 	"tw/internal/ethereum"
 	"tw/internal/memory"
 )
@@ -11,18 +12,8 @@ type Parser = ethereum.Parser
 type Transaction = ethereum.Transaction
 
 func NewDefaultParser() Parser {
-	cmdLogger := log.New(&consoleWriter{}, "PARSER: ", log.Ldate|log.Ltime|log.Lshortfile)
-	observer := ethereum.NewJSONRpcBasedObserver(http.DefaultClient, cmdLogger)
+	observer := ethereum.NewJSONRpcBasedObserver(http.DefaultClient, clogger.ConsoleLogger)
 	storage := memory.NewMemoryTransactionStorage()
 
-	return ethereum.NewJSONRPCParser(observer, storage, http.DefaultClient, cmdLogger)
-}
-
-type consoleWriter struct {
-}
-
-func (c *consoleWriter) Write(p []byte) (n int, err error) {
-	log.Println(string(p))
-
-	return len(p), nil
+	return ethereum.NewJSONRPCParser(observer, storage, http.DefaultClient, clogger.ConsoleLogger)
 }

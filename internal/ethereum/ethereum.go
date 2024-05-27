@@ -8,9 +8,10 @@ import (
 	"sync"
 )
 
-// maxBlockDepth describes how many blocks from the current one
-// we are going to look for the transactions.
-const maxBlockDepth = 20
+var (
+	getCurrentBlockFunc         = getCurrentBlock
+	getTransactionsForBlockFunc = getTransactionsForBlock
+)
 
 // Parser must be implemented by any struct
 // that can communicate with the ethereum
@@ -124,7 +125,7 @@ func (jp *JSONRPCParser) Close() error {
 
 // GetCurrentBlock returns an number of current block.
 func (jp *JSONRPCParser) GetCurrentBlock() int {
-	res, err := getCurrentBlock(jp.httpClient)
+	res, err := getCurrentBlockFunc(jp.httpClient)
 	if err != nil {
 		jp.logger.Printf("get current block error: %s", err.Error())
 		return 0

@@ -12,11 +12,6 @@ import (
 
 const checkBlockNumberIntervalSeconds = 5
 
-var (
-	getCurrentBlockFunc         = getCurrentBlock
-	getTransactionsForBlockFunc = getTransactionsForBlock
-)
-
 type JSONRpcBasedObserver struct {
 	httpClient *http.Client
 	logger     *log.Logger

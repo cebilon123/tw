@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestJSONRpcBasedObserver_ObserveAddress_AddressExists(t *testing.T) {
+func TestJSONRpcBasedObserver_ObserveAddress_Then_GetTransactions(t *testing.T) {
 	var mu sync.Mutex
 
 	currBlockNum := 0
