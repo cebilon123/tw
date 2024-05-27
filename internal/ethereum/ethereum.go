@@ -8,11 +8,6 @@ import (
 	"sync"
 )
 
-var (
-	getCurrentBlockFunc         = getCurrentBlock
-	getTransactionsForBlockFunc = getTransactionsForBlock
-)
-
 // Parser must be implemented by any struct
 // that can communicate with the ethereum
 // in order to work with the blockchain.
@@ -41,6 +36,16 @@ type TransactionsStorage interface {
 	// GetTransactionsForAddress returns transactions for a given
 	// address. It should be multiple goroutines safe.
 	GetTransactionsForAddress(address string) []Transaction
+}
+
+// ApiWrapper must be implemented by the struct
+// that can execute http requests to the ethereum
+// JSONRPC api.
+type ApiWrapper interface {
+	// GetCurrentBlock returns newest block from the ethereum api.
+	GetCurrentBlock(httpClient *http.Client) (string, error)
+	// GetTransactionsForBlock returns transactions for given block number.
+	GetTransactionsForBlock(httpClient *http.Client, blockNum string) ([]Transaction, error)
 }
 
 // Transaction represents transaction from
@@ -85,6 +90,7 @@ type JSONRPCParser struct {
 	transactionsStorage TransactionsStorage
 	logger              *log.Logger
 	httpClient          *http.Client
+	apiWrapper          ApiWrapper
 
 	closeChan     chan struct{}
 	subscribersWG sync.WaitGroup
@@ -97,6 +103,7 @@ var _ io.Closer = (*JSONRPCParser)(nil)
 func NewJSONRPCParser(
 	observer Observer,
 	transactionsStorage TransactionsStorage,
+	apiWrapper ApiWrapper,
 	httpClient *http.Client,
 	logger *log.Logger,
 ) *JSONRPCParser {
@@ -105,6 +112,7 @@ func NewJSONRPCParser(
 	return &JSONRPCParser{
 		observer:            observer,
 		httpClient:          httpClient,
+		apiWrapper:          apiWrapper,
 		logger:              logger,
 		transactionsStorage: transactionsStorage,
 		closeChan:           closeChan,
@@ -125,7 +133,7 @@ func (jp *JSONRPCParser) Close() error {
 
 // GetCurrentBlock returns an number of current block.
 func (jp *JSONRPCParser) GetCurrentBlock() int {
-	res, err := getCurrentBlockFunc(jp.httpClient)
+	res, err := jp.apiWrapper.GetCurrentBlock(jp.httpClient)
 	if err != nil {
 		jp.logger.Printf("get current block error: %s", err.Error())
 		return 0
@@ -147,6 +155,8 @@ func (jp *JSONRPCParser) Subscribe(address string) bool {
 
 	jp.subscribersWG.Add(1)
 
+	println(address)
+	println(transactionsChan)
 	go jp.onTransactionsSubscribe(address, transactionsChan)
 
 	return true

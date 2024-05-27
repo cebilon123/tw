@@ -15,6 +15,7 @@ const checkBlockNumberIntervalSeconds = 5
 type JSONRpcBasedObserver struct {
 	httpClient *http.Client
 	logger     *log.Logger
+	apiWrapper ApiWrapper
 
 	closeChan chan struct{}
 }
@@ -22,10 +23,11 @@ type JSONRpcBasedObserver struct {
 var _ Observer = (*JSONRpcBasedObserver)(nil)
 var _ io.Closer = (*JSONRpcBasedObserver)(nil)
 
-func NewJSONRpcBasedObserver(httpClient *http.Client, logger *log.Logger) *JSONRpcBasedObserver {
+func NewJSONRpcBasedObserver(httpClient *http.Client, logger *log.Logger, apiWrapper ApiWrapper) *JSONRpcBasedObserver {
 	return &JSONRpcBasedObserver{
 		httpClient: httpClient,
 		logger:     logger,
+		apiWrapper: apiWrapper,
 		closeChan:  make(chan struct{}, 1),
 	}
 }
@@ -57,7 +59,7 @@ func (j *JSONRpcBasedObserver) ObserveAddress(address string) (<-chan Transactio
 	// we are checking if new blocks appeared
 	go func() {
 		for {
-			num, err := getCurrentBlockFunc(j.httpClient)
+			num, err := j.apiWrapper.GetCurrentBlock(j.httpClient)
 			if err != nil {
 				j.logger.Printf("get current block error: %s", err.Error())
 			}
@@ -91,7 +93,7 @@ func (j *JSONRpcBasedObserver) ObserveAddress(address string) (<-chan Transactio
 			// and then we are checking if there are any for given address
 			for i := range dif {
 				blockNum := lastBlockNum + i
-				transactions, err := getTransactionsForBlockFunc(j.httpClient, fmt.Sprintf("%x", blockNum))
+				transactions, err := j.apiWrapper.GetTransactionsForBlock(j.httpClient, fmt.Sprintf("%x", blockNum))
 				if err != nil {
 					j.logger.Printf("get transactions for block error: %s", err.Error())
 					continue
