@@ -59,6 +59,8 @@ func (j *JSONRpcBasedObserver) ObserveAddress(address string) (<-chan Transactio
 	// we are checking if new blocks appeared
 	go func() {
 		for {
+			j.logger.Println("checking for new block")
+
 			num, err := j.apiWrapper.GetCurrentBlock(j.httpClient)
 			if err != nil {
 				j.logger.Printf("get current block error: %s", err.Error())
@@ -88,6 +90,8 @@ func (j *JSONRpcBasedObserver) ObserveAddress(address string) (<-chan Transactio
 			if dif == 0 {
 				continue
 			}
+
+			j.logger.Println("new block found, looking for transactions")
 
 			// for each new block after the last block we are fetching the transactions
 			// and then we are checking if there are any for given address

@@ -155,8 +155,6 @@ func (jp *JSONRPCParser) Subscribe(address string) bool {
 
 	jp.subscribersWG.Add(1)
 
-	println(address)
-	println(transactionsChan)
 	go jp.onTransactionsSubscribe(address, transactionsChan)
 
 	return true
