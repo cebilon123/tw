@@ -6,7 +6,7 @@ import (
 	"tw/internal/ethereum"
 )
 
-// TransactionMemoryStorage is simple in memory serializer
+// TransactionMemoryStorage is simple in memory storage
 // for the transactions.
 type TransactionMemoryStorage struct {
 	transactionsMap map[string][]ethereum.Transaction
