@@ -34,7 +34,7 @@ func (e *EthApiWrapper) GetCurrentBlock(httpClient *http.Client) (string, error)
 		ID:      generateRandomID(),
 		JSONRpc: defaultJSONRpc,
 		Method:  methodGetCurrentBlock,
-		Params:  []string{},
+		Params:  []any{},
 	}
 
 	body, err := json.Marshal(ethReq)
@@ -75,9 +75,9 @@ func (e *EthApiWrapper) GetTransactionsForBlock(httpClient *http.Client, blockNu
 		ID:      generateRandomID(),
 		JSONRpc: defaultJSONRpc,
 		Method:  methodGetBlockByNumber,
-		Params: []string{
-			blockNum,
-			"false",
+		Params: []any{
+			fmt.Sprintf("0x%s", blockNum),
+			true,
 		},
 	}
 
@@ -106,20 +106,23 @@ func (e *EthApiWrapper) GetTransactionsForBlock(httpClient *http.Client, blockNu
 		return nil, fmt.Errorf("read all bytes from response: %w", err)
 	}
 
-	var ethRes getBlockByNumberResponse
+	var ethRes getBlockByNumberResponseFixed
 	if err := json.Unmarshal(readBytes, &ethRes); err != nil {
 		return nil, fmt.Errorf("json unmarshal bytes from response: %w", err)
 	}
 
-	var transactions []Transaction
+	transactions := make([]Transaction, 0, len(ethRes.Result.Transactions))
 
-	for _, transactionHash := range ethRes.Result.Transactions {
-		transaction, err := e.getTransaction(httpClient, transactionHash)
-		if err != nil {
-			return nil, fmt.Errorf("fetching transactions: %w", err)
-		}
-
-		transactions = append(transactions, *transaction)
+	//for _, transactionHash := range ethRes.Result.Transactions {
+	//	transaction, err := e.getTransaction(httpClient, transactionHash)
+	//	if err != nil {
+	//		return nil, fmt.Errorf("fetching transactions: %w", err)
+	//	}
+	//
+	//	transactions = append(transactions, *transaction)
+	//}
+	for _, transaction := range ethRes.Result.Transactions {
+		transactions = append(transactions, transaction)
 	}
 
 	return transactions, nil
@@ -130,7 +133,7 @@ func (e *EthApiWrapper) getTransaction(httpClient *http.Client, transactionHash 
 		ID:      generateRandomID(),
 		JSONRpc: defaultJSONRpc,
 		Method:  methodGetTransactionByHash,
-		Params: []string{
+		Params: []any{
 			transactionHash,
 		},
 	}
@@ -169,17 +172,53 @@ func (e *EthApiWrapper) getTransaction(httpClient *http.Client, transactionHash 
 }
 
 type ethRequest struct {
-	ID      int64    `json:"id"`
-	JSONRpc string   `json:"jsonrpc"`
-	Method  string   `json:"method"`
-	Params  []string `json:"params"`
+	ID      int64  `json:"id"`
+	JSONRpc string `json:"jsonrpc"`
+	Method  string `json:"method"`
+	Params  []any  `json:"params"`
 }
 
 type ethBaseResponse struct {
 	JSONRpc string `json:"jsonrpc"`
 	Result  string `json:"result"`
 }
-
+type getBlockByNumberResponseFixed struct {
+	Jsonrpc string `json:"jsonrpc"`
+	Result  struct {
+		BaseFeePerGas         string        `json:"baseFeePerGas"`
+		BlobGasUsed           string        `json:"blobGasUsed"`
+		Difficulty            string        `json:"difficulty"`
+		ExcessBlobGas         string        `json:"excessBlobGas"`
+		ExtraData             string        `json:"extraData"`
+		GasLimit              string        `json:"gasLimit"`
+		GasUsed               string        `json:"gasUsed"`
+		Hash                  string        `json:"hash"`
+		LogsBloom             string        `json:"logsBloom"`
+		Miner                 string        `json:"miner"`
+		MixHash               string        `json:"mixHash"`
+		Nonce                 string        `json:"nonce"`
+		Number                string        `json:"number"`
+		ParentBeaconBlockRoot string        `json:"parentBeaconBlockRoot"`
+		ParentHash            string        `json:"parentHash"`
+		ReceiptsRoot          string        `json:"receiptsRoot"`
+		Sha3Uncles            string        `json:"sha3Uncles"`
+		Size                  string        `json:"size"`
+		StateRoot             string        `json:"stateRoot"`
+		Timestamp             string        `json:"timestamp"`
+		TotalDifficulty       string        `json:"totalDifficulty"`
+		Transactions          []Transaction `json:"transactions"`
+		TransactionsRoot      string        `json:"transactionsRoot"`
+		Uncles                []interface{} `json:"uncles"`
+		Withdrawals           []struct {
+			Index          string `json:"index"`
+			ValidatorIndex string `json:"validatorIndex"`
+			Address        string `json:"address"`
+			Amount         string `json:"amount"`
+		} `json:"withdrawals"`
+		WithdrawalsRoot string `json:"withdrawalsRoot"`
+	} `json:"result"`
+	Id int64 `json:"id"`
+}
 type getBlockByNumberResponse struct {
 	Jsonrpc string `json:"jsonrpc"`
 	Result  struct {

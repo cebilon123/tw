@@ -6,7 +6,7 @@ import (
 	"tw/pkg"
 )
 
-const testAddress = "0x55a380d134d722006a5ce2d510562e1239d225b1"
+const testAddress = "0xdAC17F958D2ee523a2206206994597C13D831ec7"
 
 func main() {
 	parser := pkg.NewDefaultParser()

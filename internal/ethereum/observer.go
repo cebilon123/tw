@@ -6,6 +6,7 @@ import (
 	"log"
 	"math/big"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
@@ -104,9 +105,8 @@ func (j *JSONRpcBasedObserver) ObserveAddress(address string) (<-chan Transactio
 				}
 
 				for _, transaction := range transactions {
-
 					// there is an transaction for a given address, we are sending it to chan
-					if transaction.From == address || transaction.To == address {
+					if strings.ToLower(transaction.To) == strings.ToLower(address) {
 						// we want to be sure that we are not going to send anything more on the closed channel
 						mu.Lock()
 						if closed {

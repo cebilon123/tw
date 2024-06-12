@@ -11,7 +11,8 @@ import (
 type TransactionMemoryStorage struct {
 	transactionsMap map[string][]ethereum.Transaction
 
-	mu sync.Mutex
+	mu   sync.Mutex
+	rwMu sync.RWMutex
 }
 
 var _ ethereum.TransactionsStorage = (*TransactionMemoryStorage)(nil)
